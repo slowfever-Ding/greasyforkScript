@@ -1,1 +1,5 @@
-# 使用示例 https://github.com/slowfever-Ding/greasyforkScript/raw/main/util/脚本文件.js
+# Greasy Fork 脚本导入列表
+
+以下是要导入的脚本 URL 列表：
+
+- https://github.com/slowfever-Ding/greasyforkScript/raw/main/util/script.user.js
