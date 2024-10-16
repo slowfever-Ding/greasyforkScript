@@ -1,4 +1,4 @@
-# Greasy Fork 脚本导入列表
+# Greasy Fork 脚本导入
 
 以下是要导入的脚本 URL 列表：
 
