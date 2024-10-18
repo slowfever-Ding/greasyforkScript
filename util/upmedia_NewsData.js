@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name        每分钟自动获取 ‘上报 up media’ 新闻数据
 // @namespace   http://tampermonkey.net/
-// @match       *://*upmedia*.mg/*
+// @match       *://*.upmedia*.mg/*
+// @match       *://*.upmedia.*/*
 // @grant       none
-// @version     1.0.0
+// @version     1.0.1
 // @author      slowFever
 // @description 自动获取 ‘上报 up media’ 新闻数据, 并保存到浏览器本地localStorage中。
 // @icon        https://www.upmedia.mg/images/favicon.png
