@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         下载当前页面指定数据 （img, video, audio, ...）
 // @namespace    http://tampermonkey.net/
-// @version      1.0.3
+// @version      1.0.4
 // @description  调用 downloadDataInOrder(obtainDataNodes(document.querySelectorAll('数据节点'), 'file')) 方法，并传入数据节点，根据传入的数据节点，下载网页上的数据并保存到本地
 // @author       slowFever
 // @match        *://*/*
@@ -48,11 +48,13 @@
                     if (response.status === 200) {
                         const blob = new Blob([response.response]); // 创建 Blob 对象
                         const link = document.createElement('a'); // 创建 <a> 标签
-                        link.href = URL.createObjectURL(blob); // 创建 URL 对象
+                        const objectURL = URL.createObjectURL(blob); // 创建 Blob URL
+                        link.href = objectURL;
                         link.download = filename; // 设置下载的文件名
                         document.body.appendChild(link); // 添加到文档中
                         link.click(); // 模拟点击下载
                         document.body.removeChild(link); // 下载完成后移除 <a> 标签
+                        URL.revokeObjectURL(objectURL); // 释放 Blob URL
                         console.log(`成功下载数据：${filename}`);
                         resolve(); // 下载完成，调用 resolve
                     } else {
