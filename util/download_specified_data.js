@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         下载当前页面指定数据 （img, video, audio, ...）
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1
+// @version      1.0.2
 // @description  调用 downloadDataInOrder(obtainDataNodes(document.querySelectorAll('数据节点'), 'file')) 方法，并传入数据节点，根据传入的数据节点，下载网页上的数据并保存到本地
 // @author       slowFever
+// @match        *://*/*
 // @match        *
 // @connect      *
 // @grant        unsafeWindow
