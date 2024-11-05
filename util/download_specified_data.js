@@ -69,19 +69,19 @@
     }
 
     /**
-     * @name 按顺序下载数据的函数
+     * @name 分批按顺序下载数据的函数
      * @param nodesData 数据节点
      * @param prefix 文件名前缀
+     * @param batchSize 每次下载的最大文件数量
      */
-    async function downloadDataInOrder(nodesData, prefix = 'file') {
-        for (let i = 0; i < nodesData.length; i++) {
-            const url = nodesData[i];
-            const fileName = `${prefix}-${i + 1}.${url.split('.').pop().split('?')[0]}`;
-            try {
-                await downloadFile(url, fileName); // 等待下载完成后再进行下一个
-            } catch (error) {
-                console.error(`文件 ${fileName} 下载失败:`, error);
-            }
+    async function downloadDataInOrder(nodesData, prefix = 'file', batchSize = 10) {
+        for (let i = 0; i < nodesData.length; i += batchSize) {
+            const batch = nodesData.slice(i, i + batchSize); // 获取当前批次的数据
+            await Promise.all(batch.map((url, index) => {
+                const fileName = `${prefix}-${i + index + 1}.${url.split('.').pop().split('?')[0]}`;
+                return downloadFile(url, fileName);
+            }));
+            console.log(`完成批次 ${Math.floor(i / batchSize) + 1} 的下载`);
         }
     }
 
