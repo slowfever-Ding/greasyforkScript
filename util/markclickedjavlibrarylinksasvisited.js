@@ -17,8 +17,9 @@
     GM_addStyle(`
         .pubgroup td a::before {
             content: "●";
-            color: #1a9317;
+            color: #33c82f;
             padding-right: 4px;
+            font-size: 20px;
         }
         
         .pubgroup td a:visited::before {
