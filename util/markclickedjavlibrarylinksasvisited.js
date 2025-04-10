@@ -7,8 +7,9 @@
 // @match       *://*javlibrary.com/*
 // @match       *://*javlibrary*/*
 // @grant       GM_addStyle
-// @version     1.0.2
+// @version     1.0.3
 // @description 2025/4/10 17:05:49
+// @license     MIT
 // ==/UserScript==
 
 (function () {
