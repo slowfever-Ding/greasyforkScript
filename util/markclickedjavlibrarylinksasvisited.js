@@ -7,7 +7,7 @@
 // @match       *://*javlibrary.com/*
 // @match       *://*javlibrary*/*
 // @grant       GM_addStyle
-// @version     1.0.1
+// @version     1.0.2
 // @description 2025/4/10 17:05:49
 // ==/UserScript==
 
@@ -15,14 +15,14 @@
     'use strict';
 
     GM_addStyle(`
-        .pubgroup td a::before {
+        .pubgroup td.left::before {
             content: "●";
             color: #33c82f;
             padding-right: 4px;
             font-size: 20px;
         }
         
-        .pubgroup td a:visited::before {
+        .pubgroup td.left:visited::before {
             color: #aaa;
         }
     `);
