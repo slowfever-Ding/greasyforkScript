@@ -11,7 +11,7 @@
 // @connect     ja.wikipedia.org
 // @connect     zh.wikipedia.org
 // @connect     xslist.org
-// @version     1.0.1
+// @version     1.0.2
 // @author      slowFever
 // @description 自动获取影迷的秘密中当前页面的神秘代码。
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=www.63h.net
@@ -160,10 +160,13 @@
     }
     `)
 
+    // 获取当前页面的标题、番号
     const titleElement = document.querySelector('.entry-header h1.entry-title');
+    // 获取当前页面的图片
     const imgElement = document.querySelectorAll('.entry-content p > img');
+    // 获取当前页面的名字
     const names = [...document.querySelectorAll('.tags-links a[rel="tag"]')].map(a => a.textContent);
-    console.log(names);
+    console.log('获取到的名字：', names);
 
     if (!titleElement || !imgElement.length || !titleElement.textContent.match(/[A-Z]{2,}-\d{2,}/i)) {
         console.error('未找到标题、图片或番号，脚本停止执行。');
@@ -258,9 +261,10 @@
         });
     });
 
-
+    // 默认图片
     const DEFAULT_IMAGE = 'https://img.picui.cn/free/2025/06/04/683feea79611e.png';
 
+    // 设置默认图片
     function getDefaultImage() {
         return DEFAULT_IMAGE;
     }
@@ -362,6 +366,7 @@
                             // 出生日期和年龄，身高，罩杯
                             if (/生年月日/.test(label)) {
                                 birthday = value.replace(/\[.*?\]/g, '').trim();
+
                                 const dateMatch = birthday.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
                                 if (dateMatch) {
                                     const [_, y, m, d] = dateMatch;
@@ -461,7 +466,7 @@
             GM_xmlhttpRequest({
                 method: 'GET',
                 headers: {
-                    'Cookie': 'cf_clearance=dgb8MaaYjzyNFCzmr6OzDUh7Sh1iTMAGLD.3ev3HfbM-1749042599-1.2.1.1-RTGtDPEZBHm486vM6uT88n8qGM.Thl6uf9EeCGL.RIPOk3ytRak.Y6qN.Ku0Ur2kvs60vzkHuI3lijUkYMkvpB1Xj6Hgl5qxkn0av69B.BrPDnphyWFP55b6pEgBI44Y.Bu4I6te3CcTazjvERkE5QZS7hAYseb1BUmv9W_wOiLnqdsUjQLNczr5WcW9Ic3ho409q8wMm9aG3kSYOhvfo9g1wwXR3hkcidkoxePtmq_4P9Hu3h.sCDKtLo5.kvWAoOdV2nxqENIika0UNogk2jYdvqIrDAhm8p1YKAqIQ8ocQSU4aFy.rUcRBv4osCOZytsiab76cwTlGRct71qHiFtPr8StHP3wyJekvX4zoeWfCqbeaLvJHDSrfn1_Rpvb', // 替换为最新值
+                    'Cookie': 'cf_clearance=o6H5dOQSOaguBzjxLgqprMKO4_E8YgLmMHtNnC5fbSA-1749105768-1.2.1.1-4Ty7OrT.Z_2VVJ5vHLUXoWJNmhskKKA6JXRLjxYlsgsQMVQ0kqRxTAHIHbylHnV7rZ4X4dBlsQR11UIixNkOgu_xTpnRw6VTDK1.0fm.rA0XNvFosogudw8AiQLN0DTBX51hu4ttwe9oSQtqxk9kf3Lo49apAE_hUoPMrbZmP92TwVRXWfMxtH1a6vqwPOVxaS3CmBP42qMceEqSdXhIh.b7lQhXzKF.n.Tvx0hdF41Fm6X1MzC7OiANRBJSY92Yc.DBNiJ6CxbJBiEYAGCAt3_f9IhAypcqxdSb3i.YR3.KwH8AeeELCQGbUa1_5o7YDZlEINYMeiCo1tuvq7aGzCc7Y3TjGKNzIZ0HABGXpNgMSjJce.UzfPxQISSzlK7R', // 替换为最新值
                 },
                 url,
                 onload: (response) => {
@@ -525,7 +530,7 @@
         });
     }
 
-    // 工具函数
+    // 工具函数 start
 
     /**
      * 从 infobox DOM 元素中提取有效图片 URL，优先选择 Wikimedia Commons 中的头像图。
@@ -543,7 +548,12 @@
             const fullSrc = src.startsWith('http') ? src : 'https:' + src;
             const isFromCommons = fullSrc.includes('upload.wikimedia.org/wikipedia/commons/thumb/');
             const isValidImage = /\.(jpg|jpeg|png)$/i.test(fullSrc);
-            const isJunkImage = /\/(Flag_of_|Heart_|Maza_sirdute|Icon_)/.test(fullSrc) || fullSrc.endsWith('.svg');
+
+            // 排除无关图片
+            const isJunkImage =
+                /\/(Flag_of_|Heart_|Maza_sirdute|Icon_|Commons_|Wiki|Wikiquote|Wikidata|Wikisource)/.test(fullSrc) ||
+                /signature|colored_paper|autograph|logo|symbol|flag|icon/i.test(fullSrc) ||
+                fullSrc.endsWith('.svg');
 
             if (isFromCommons && isValidImage && !isJunkImage) {
                 return fullSrc;
@@ -553,6 +563,19 @@
         return null;
     }
 
+    // 工具函数 end
+
+    /**
+     * 更新页面上 .profile 区块中的女优信息展示。
+     * 会根据传入的 info 对象，动态替换头像、姓名、年龄、身高、罩杯字段内容。
+     *
+     * @param {Object} info - 女优信息对象。
+     * @param {string} info.name - 女优名称。
+     * @param {number|string|null} info.age - 年龄（如果未知则为 null）。
+     * @param {number|string|null} info.height - 身高（单位为 cm，未知为 null）。
+     * @param {string|null} info.cup - 罩杯（如 "F"，未知为 null）。
+     * @param {string} info.image - 女优头像 URL。
+     */
     function updateProfile(info) {
         const profile = document.querySelector('.profile');
         if (!profile) return;
@@ -568,9 +591,57 @@
         `;
     }
 
-    fetchActressInfoFromSources(names[2]).then(info => {
-        console.log('[女优信息]:', info);
-        updateProfile(info);
-    });
+    /**
+     * 按顺序遍历给定的女优姓名列表，依次尝试从各信息源抓取数据。
+     * 若成功获取包含身高、年龄、罩杯的完整信息，则立即返回该信息；
+     * 若全部尝试后仍未获取到完整数据，则返回 null。
+     *
+     * @param {string[]} names - 女优姓名数组，按优先顺序排列。
+     * @returns {Promise<Object|null>} - 成功时返回包含完整字段的女优信息对象，否则返回 null。
+     */
+    async function fetchFromNameList(names) {
+        let count = 0;
+        for (const name of names) {
+            const info = await fetchActressInfoFromSources(name);
+            count++;
+            console.log(`[尝试第 ${count} 个名称: ${name}]`, info);
+            if (info.height && info.age && info.cup) {
+                console.log(`[成功获取女优🍉 ${names[count-1]} 的信息]`);
+                return info;
+            }
+        }
+
+        console.log(`共尝试 ${count} 个名称，未获取完整信息`);
+        return null;
+    }
+
+    /**
+     * 根据一组女优姓名，依次尝试获取其信息，直到获取到包含年龄、身高、罩杯的完整信息。
+     * 成功后调用 updateProfile 渲染页面，否则提示失败信息。
+     *
+     * @param {string[]} names - 要尝试抓取信息的女优姓名列表。
+     */
+    fetchFromNameList(names)
+        /**
+         * 获取成功：控制台输出信息并更新页面上的 profile 区域。
+         * @type {Object} info - 获取到的女优信息对象。
+         */
+        .then(info => {
+            console.log('[女优信息]:', info);
+            updateProfile(info);
+        })
+        /**
+         * 获取失败：输出错误信息并在页面上显示错误提示。
+         * @type {Error} err - 捕获到的异常信息。
+         */
+        .catch(err => {
+            console.error('获取女优信息失败:', err);
+            const profile = document.querySelector('.profile');
+            if (!profile) return;
+
+            profile.innerHTML = `
+                <h4 style="text-align: center;flex: 1;margin: 0;color: #000;font-size: 14px;">获取女优信息失败</h4>
+            `;
+        });
 
 })()
