@@ -12,7 +12,7 @@
 // @connect     zh.wikipedia.org
 // @connect     missav.ws
 // @connect     xslist.org
-// @version     1.0.4
+// @version     1.0.5
 // @author      slowFever
 // @description 自动获取影迷的秘密中当前页面的神秘代码。
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=www.63h.net
@@ -388,7 +388,7 @@
                                     age = now.getFullYear() - birthDate.getFullYear();
                                     if (now < new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate())) age--;
                                 }
-                            } else if (/身長|体重/.test(label)) {
+                            } else if (/^身長$|^体重$/.test(label)) {
                                 const h = (label + value).match(/(\d{2,3})\s*(厘米|cm)/i);
                                 if (h) height = h[1];
                             } else if (/ブラサイズ/.test(label)) {
@@ -453,7 +453,7 @@
                                     age = now.getFullYear() - birthDate.getFullYear();
                                     if (now < new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate())) age--;
                                 }
-                            } else if (/身高|体重/.test(label + value)) {
+                            } else if (/^身高$|^体重$/.test(label + value)) {
                                 const h = (label + value).match(/(\d{2,3})\s*(厘米|cm)/i);
                                 if (h) height = h[1];
                             } else if (/三围|罩杯/.test(label)) {
