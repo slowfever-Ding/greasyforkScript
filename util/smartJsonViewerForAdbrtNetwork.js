@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         adbrt.network JSON数据高亮（多主题）
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1
+// @version      1.0.2
 // @description  高亮并格式化显示页面内 JSON 数据，支持多主题切换
 // @author       slowFever
 // @match        https://partner.adbrt.network/*
@@ -75,17 +75,17 @@
         `
         },
         {
-            name: '烈焰红',
+            name: '暗红紫',
             css: `
-            .json-block {
-                background: #3b0000;
-                color: #ffeaea;
-            }
-            .json-key { color: #ff6b6b; }
-            .json-string { color: #ffa07a; }
-            .json-number { color: #ff6347; }
-            .json-boolean { color: #ff4500; }
-            .json-null { color: #ff1493; }
+        .json-block {
+            background: #1a0000;
+            color: #ffcccc;
+        }
+        .json-key { color: #ff3333; }
+        .json-string { color: #ff6666; }
+        .json-number { color: #ff4040; }
+        .json-boolean { color: #cc0000; }
+        .json-null { color: #990000; }
         `
         },
         {
@@ -100,6 +100,34 @@
             .json-number { color: #e879f9; }
             .json-boolean { color: #a855f7; }
             .json-null { color: #d946ef; }
+        `
+        },
+        {
+            name: '霓虹青紫',
+            css: `
+        .json-block {
+            background: #001a1a;
+            color: #ccffff;
+        }
+        .json-key { color: #00ffff; }
+        .json-string { color: #66ffff; }
+        .json-number { color: #33ffff; }
+        .json-boolean { color: #00cccc; }
+        .json-null { color: #009999; }
+        `
+        },
+        {
+            name: '霓虹紫红',
+            css: `
+        .json-block {
+            background: #1a001a;
+            color: #ffccff;
+        }
+        .json-key { color: #ff66ff; }
+        .json-string { color: #ff99ff; }
+        .json-number { color: #ff33ff; }
+        .json-boolean { color: #ff00ff; }
+        .json-null { color: #cc00cc; }
         `
         }
     ];
@@ -269,7 +297,7 @@
         btn.style.cssText = `
             margin-right: 8px;
             padding: 4px 10px;
-            border-radius: 16px;
+            border-radius: 5px;
             font-size: 12px;
             background: #444;
             color: #fff;
