@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         adbrt.network JSON数据高亮（多主题）
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.0.1
 // @description  高亮并格式化显示页面内 JSON 数据，支持多主题切换
 // @author       slowFever
 // @match        https://partner.adbrt.network/*
@@ -9,7 +9,8 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @run-at       document-end
-// @icon        https://www.google.com/s2/favicons?sz=64&domain=adbrt.network
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=adbrt.network
+// @license      MIT
 // ==/UserScript==
 
 (function () {
