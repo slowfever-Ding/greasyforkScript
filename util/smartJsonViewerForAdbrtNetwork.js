@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         adbrt.network JSON数据高亮（多主题）
 // @namespace    http://tampermonkey.net/
-// @version      1.0.3
+// @version      1.0.4
 // @description  高亮并格式化显示页面内 JSON 数据，支持多主题切换
 // @author       slowFever
 // @match        https://partner.adbrt.network/*
@@ -27,7 +27,7 @@
             }
             .json-key { color: #ff6670; }
             .json-string { color: #a4ce78; }
-            .json-number { color: #a4ce78; }
+            .json-number { color: #e59011; }
             .json-boolean { color: #569cd6; }
             .json-null { color: #c586c0; }
         `
@@ -100,20 +100,6 @@
             .json-number { color: #e879f9; }
             .json-boolean { color: #a855f7; }
             .json-null { color: #d946ef; }
-        `
-        },
-        {
-            name: '霓虹青紫',
-            css: `
-        .json-block {
-            background: #001a1a;
-            color: #ccffff;
-        }
-        .json-key { color: #00ffff; }
-        .json-string { color: #66ffff; }
-        .json-number { color: #33ffff; }
-        .json-boolean { color: #00cccc; }
-        .json-null { color: #009999; }
         `
         },
         {
