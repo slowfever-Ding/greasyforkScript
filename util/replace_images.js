@@ -9,7 +9,7 @@
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_notification
-// @version     1.0.0
+// @version     1.0.1
 // @author      slowFever
 // @description 替换当前页所有图片的src，鼠标移过图片时，显示原始图片，一键切换/复原！
 // @icon        data:image/png;base64,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
@@ -46,18 +46,20 @@
                 transform: translateY(-50%);
                 padding: 5px;
                 z-index: 999999;
+                pointer-events: none;
             }
 
             #operation .operation-wrap {
-                -webkit-transform: translateX(-95%);
-                -moz-transform: translateX(-95%);
-                -ms-transform: translateX(-95%);
-                -o-transform: translateX(-95%);
-                transform: translateX(-95%);
+                -webkit-transform: translateX(-90%);
+                -moz-transform: translateX(-90%);
+                -ms-transform: translateX(-90%);
+                -o-transform: translateX(-90%);
+                transform: translateX(-90%);
                 -webkit-transition: 0.5s;
                 -o-transition: 0.5s;
                 -moz-transition: 0.5s;
                 transition: 0.5s;
+                pointer-events: auto;
             }
             
             #operation button {
@@ -75,8 +77,8 @@
                 font-size: 17px;
                 border-radius: 500px;
                 overflow: hidden;
-                background: rgb(32 156 238);
-                color: ghostwhite;
+                background: rgb(32, 156, 238);
+                color: #000;
             }
             
             #operation button span {
@@ -89,7 +91,7 @@
             }
             
             #operation button:hover span {
-                color: black;
+                color: ghostwhite;
             }
             
             #operation button::before,
@@ -104,7 +106,7 @@
             
             #operation button::before {
                 content: "";
-                background: #000;
+                background: linear-gradient(120deg, rgba(255,255,255,0.7), rgba(0,191,255,0.4));
                 width: 120%;
                 left: -10%;
                 -webkit-transform: skew(30deg);
@@ -143,17 +145,19 @@
      * @returns {void}
      */
     function createPanel() {
-        let  panel = document.createElement('div');
-        panel.innerHTML = `
-            <div id="operation">
-                <div class="operation-wrap">
-                    <button class="status-button">
-                        <span>hide</span>
-                    </button>
-                </div>
+        const panelHTML = `
+        <div id="operation">
+            <div class="operation-wrap">
+                <button class="status-button">
+                    <span>hide</span>
+                </button>
             </div>
-        `;
-        document.body.appendChild(panel);
+        </div>
+    `;
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = panelHTML;
+        console.log(wrapper.firstElementChild);
+        document.body.appendChild(wrapper.firstElementChild);
     }
 
     /**
@@ -180,7 +184,7 @@
     // 监听按钮的点击事件
     nodesList.button.addEventListener('click', () => {
         isReplacingImages = !isReplacingImages;
-        GM_setValue('isReplacingImages', isReplacingImages);  // 保存状态
+        GM_setValue('isReplacingImages', isReplacingImages); // 保存状态
         if (isReplacingImages) {
             replaceImagesWithCanvasText();
             nodesList.button.innerHTML = '<span>show</span>';
