@@ -8,11 +8,11 @@
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_xmlhttpRequest
+// @connect     missav.ws
 // @connect     ja.wikipedia.org
 // @connect     zh.wikipedia.org
-// @connect     missav.ws
 // @connect     xslist.org
-// @version     1.0.6
+// @version     1.0.7
 // @author      slowFever
 // @description 自动获取影迷的秘密中当前页面的神秘代码。
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=www.63h.net
@@ -185,8 +185,8 @@
         return;
     }
 
-    console.table([{ title: titleElement.textContent }]);
-    console.table(
+    console.log({ title: titleElement.textContent });
+    console.log(
         [...imgElement].map((img, index) => ({
             index: index + 1,
             src: img.src
@@ -286,198 +286,11 @@
     }
 
     /**
-     * 主函数：根据女优名称从多个来源抓取信息并合并。
-     * @param {string} name - 女优名称。
-     * @returns {Promise<Object>} 包含合并后的女优信息。
-     */
-    async function fetchActressInfoFromSources(name) {
-        // 存储返回的结果
-        let results = [];
-
-        // 定义信息来源函数列表（按优先级）
-        const sources = [
-            fetchFromWikipedia_ja,
-            fetchFromWikipedia_zh,
-            fetchFromMissAV,
-            fetchFromXSList,
-        ];
-
-        // 遍历每个信息来源，尝试抓取
-        for (const fetchFn of sources) {
-            try {
-                const result = await fetchFn(name);
-                console.log(`从 ${fetchFn.name} 获取结果:`, result);
-                if (result) results.push(result);
-            } catch (e) {
-                console.warn(`来源错误: ${fetchFn.name}`, e);
-            }
-        }
-
-        // 按优先顺序合并字段（谁先提供就用谁的）
-        const merged = {
-            name,
-            source: results.map(r => r.source).join(','), // 合并来源
-            birthday: null,
-            age: null,
-            height: null,
-            cup: null,
-            image: null
-        };
-
-        // 从结果集中提取最早获取到的字段
-        for (const r of results) {
-            if (!merged.birthday && r.birthday) merged.birthday = r.birthday;
-            if (!merged.age && r.age) merged.age = r.age;
-            if (!merged.height && r.height) merged.height = r.height;
-            if (!merged.cup && r.cup) merged.cup = r.cup;
-            if (!merged.image && r.image && !_isDefaultImage(r.image)) {
-                merged.image = r.image;
-            }
-        }
-
-        if (!merged.image) {
-            merged.image = getDefaultImage();
-        }
-
-        return merged;
-    }
-
-    /**
-     * 从日文维基百科抓取女优信息。
-     * @param {string} name - 女优名称。
-     * @returns {Promise<Object|null>}
-     */
-    function fetchFromWikipedia_ja(name) {
-        return new Promise((resolve) => {
-            const wikiUrl_ja = 'https://ja.wikipedia.org/wiki/' + encodeURIComponent(name);
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: wikiUrl_ja,
-                onload: (response) => {
-                    if (response.status !== 200) return resolve(null);
-
-                    try {
-                        const doc = new DOMParser().parseFromString(response.responseText, 'text/html');
-                        const infoBox = doc.querySelector('.infobox'); // 查找信息框
-                        if (!infoBox) return resolve(null);
-
-                        let age = null, height = null, cup = null, birthday = null, image = null;
-
-                        // 通过 _extractInfoBoxImage(infoBox) 方法，获取女优照片
-                        image = _extractInfoBoxImage(infoBox)
-
-                        // 提取表格中的字段
-                        const rows = infoBox.querySelectorAll('tr');
-                        rows.forEach(row => {
-                            const header = row.querySelector('th');
-                            const data = row.querySelector('td');
-                            if (!header || !data) return;
-
-                            const label = header.textContent.trim();
-                            const value = data.textContent.trim();
-
-                            // 出生日期和年龄，身高，罩杯
-                            if (/生年月日/.test(label)) {
-                                birthday = value.replace(/\[.*?\]/g, '').trim();
-
-                                const dateMatch = birthday.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-                                if (dateMatch) {
-                                    const [_, y, m, d] = dateMatch;
-                                    const birthDate = new Date(+y, +m - 1, +d);
-                                    const now = new Date();
-                                    age = now.getFullYear() - birthDate.getFullYear();
-                                    if (now < new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate())) age--;
-                                }
-                            } else if (/身[長高]|体重/.test(label) && !/比|率/.test(label)) {
-                                const h = (label + value).match(/(\d{2,3})\s*(厘米|cm)/i);
-                                if (h) height = h[1];
-                            } else if (/ブラサイズ/.test(label)) {
-                                const cupMatch = value.match(/[A-Z]/i);
-                                if (cupMatch) cup = cupMatch[0].toUpperCase();
-                            }
-                        });
-
-                        resolve({source: 'ja.wikipedia', name, birthday, age, height, cup, image});
-                    } catch (err) {
-                        resolve(null);
-                    }
-                },
-                onerror: () => resolve(null)
-            });
-        });
-    }
-
-    /**
-     * 从中文维基百科抓取女优信息。
-     * @param {string} name - 女优名称。
-     * @returns {Promise<Object|null>}
-     */
-    function fetchFromWikipedia_zh(name) {
-        return new Promise((resolve) => {
-            const wikiUrl_zh = 'https://zh.wikipedia.org/wiki/' + encodeURIComponent(name);
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: wikiUrl_zh,
-                onload: (response) => {
-                    if (response.status !== 200) return resolve(null);
-
-                    try {
-                        const doc = new DOMParser().parseFromString(response.responseText, 'text/html');
-                        const infoBox = doc.querySelector('.infobox, .infobox.vcard, .infobox.biography.vcard');
-                        if (!infoBox) return resolve(null);
-
-                        let age = null, height = null, cup = null, birthday = null, image = null;
-
-                        // 通过 _extractInfoBoxImage(infoBox) 方法，获取女优照片
-                        image = _extractInfoBoxImage(infoBox)
-
-                        // 提取信息表中的字段
-                        const rows = infoBox.querySelectorAll('tr');
-                        rows.forEach(row => {
-                            const header = row.querySelector('th');
-                            const data = row.querySelector('td');
-                            if (!header || !data) return;
-
-                            const label = header.textContent.trim();
-                            const value = data.textContent.trim();
-
-                            // 出生日期和年龄，身高，罩杯
-                            if (/出生|生年/.test(label)) {
-                                birthday = value.replace(/\[.*?\]/g, '').trim();
-
-                                const dateMatch = birthday.match(/(\d{4})[年\-](\d{1,2})[月\-](\d{1,2})/);
-                                if (dateMatch) {
-                                    const [_, y, m, d] = dateMatch;
-                                    const birthDate = new Date(+y, +m - 1, +d);
-                                    const now = new Date();
-                                    age = now.getFullYear() - birthDate.getFullYear();
-                                    if (now < new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate())) age--;
-                                }
-                            } else if (/身[長高]|体重/.test(label) && !/比|率/.test(label)) {
-                                const h = (label + value).match(/(\d{2,3})\s*(厘米|cm)/i);
-                                if (h) height = h[1];
-                            } else if (/三围|罩杯/.test(label)) {
-                                const cupMatch = value.match(/[A-Z]/i);
-                                if (cupMatch) cup = cupMatch[0].toUpperCase();
-                            }
-                        });
-
-                        resolve({ source: 'zh.wikipedia', name, birthday, age, height, cup, image });
-                    } catch (err) {
-                        resolve(null);
-                    }
-                },
-                onerror: () => resolve(null)
-            });
-        });
-    }
-
-    /**
      * 从 MissAV 抓取女优信息。
      * @param {string} name - 女优名称。
      * @returns {Promise<Object|null>}
      */
-    function fetchFromMissAV(name) {
+    async function fetchFromMissAV(name) {
         return new Promise((resolve) => {
             const url = 'https://missav.ws/cn/actresses/' + encodeURIComponent(name);
 
@@ -564,7 +377,142 @@
         });
     }
 
-    function fetchFromXSList(name) {
+    /**
+     * 从日文维基百科抓取女优信息。
+     * @param {string} name - 女优名称。
+     * @returns {Promise<Object|null>}
+     */
+    async function fetchFromWikipedia_ja(name) {
+        return new Promise((resolve) => {
+            const wikiUrl_ja = 'https://ja.wikipedia.org/wiki/' + encodeURIComponent(name);
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: wikiUrl_ja,
+                onload: (response) => {
+                    if (response.status !== 200) return resolve(null);
+
+                    try {
+                        const doc = new DOMParser().parseFromString(response.responseText, 'text/html');
+                        const infoBox = doc.querySelector('.infobox'); // 查找信息框
+                        if (!infoBox) return resolve(null);
+
+                        let age = null, height = null, cup = null, birthday = null, image = null;
+
+                        // 通过 _extractInfoBoxImage(infoBox) 方法，获取女优照片
+                        image = _extractInfoBoxImage(infoBox)
+
+                        // 提取表格中的字段
+                        const rows = infoBox.querySelectorAll('tr');
+                        rows.forEach(row => {
+                            const header = row.querySelector('th');
+                            const data = row.querySelector('td');
+                            if (!header || !data) return;
+
+                            const label = header.textContent.trim();
+                            const value = data.textContent.trim();
+
+                            // 出生日期和年龄，身高，罩杯
+                            if (/生年月日/.test(label)) {
+                                birthday = value.replace(/\[.*?\]/g, '').trim();
+
+                                const dateMatch = birthday.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+                                if (dateMatch) {
+                                    const [_, y, m, d] = dateMatch;
+                                    const birthDate = new Date(+y, +m - 1, +d);
+                                    const now = new Date();
+                                    age = now.getFullYear() - birthDate.getFullYear();
+                                    if (now < new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate())) age--;
+                                }
+                            } else if (/身[長高]|体重/.test(label) && !/比|率/.test(label)) {
+                                const h = (label + value).match(/(\d{2,3})\s*(厘米|cm)/i);
+                                if (h) height = h[1];
+                            } else if (/ブラサイズ/.test(label)) {
+                                const cupMatch = value.match(/[A-Z]/i);
+                                if (cupMatch) cup = cupMatch[0].toUpperCase();
+                            }
+                        });
+
+                        resolve({source: 'ja.wikipedia', name, birthday, age, height, cup, image});
+                    } catch (err) {
+                        resolve(null);
+                    }
+                },
+                onerror: () => resolve(null)
+            });
+        });
+    }
+
+    /**
+     * 从中文维基百科抓取女优信息。
+     * @param {string} name - 女优名称。
+     * @returns {Promise<Object|null>}
+     */
+    async function fetchFromWikipedia_zh(name) {
+        return new Promise((resolve) => {
+            const wikiUrl_zh = 'https://zh.wikipedia.org/wiki/' + encodeURIComponent(name);
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: wikiUrl_zh,
+                onload: (response) => {
+                    if (response.status !== 200) return resolve(null);
+
+                    try {
+                        const doc = new DOMParser().parseFromString(response.responseText, 'text/html');
+                        const infoBox = doc.querySelector('.infobox, .infobox.vcard, .infobox.biography.vcard');
+                        if (!infoBox) return resolve(null);
+
+                        let age = null, height = null, cup = null, birthday = null, image = null;
+
+                        // 通过 _extractInfoBoxImage(infoBox) 方法，获取女优照片
+                        image = _extractInfoBoxImage(infoBox)
+
+                        // 提取信息表中的字段
+                        const rows = infoBox.querySelectorAll('tr');
+                        rows.forEach(row => {
+                            const header = row.querySelector('th');
+                            const data = row.querySelector('td');
+                            if (!header || !data) return;
+
+                            const label = header.textContent.trim();
+                            const value = data.textContent.trim();
+
+                            // 出生日期和年龄，身高，罩杯
+                            if (/出生|生年/.test(label)) {
+                                birthday = value.replace(/\[.*?\]/g, '').trim();
+
+                                const dateMatch = birthday.match(/(\d{4})[年\-](\d{1,2})[月\-](\d{1,2})/);
+                                if (dateMatch) {
+                                    const [_, y, m, d] = dateMatch;
+                                    const birthDate = new Date(+y, +m - 1, +d);
+                                    const now = new Date();
+                                    age = now.getFullYear() - birthDate.getFullYear();
+                                    if (now < new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate())) age--;
+                                }
+                            } else if (/身[長高]|体重/.test(label) && !/比|率/.test(label)) {
+                                const h = (label + value).match(/(\d{2,3})\s*(厘米|cm)/i);
+                                if (h) height = h[1];
+                            } else if (/三围|罩杯/.test(label)) {
+                                const cupMatch = value.match(/[A-Z]/i);
+                                if (cupMatch) cup = cupMatch[0].toUpperCase();
+                            }
+                        });
+
+                        resolve({ source: 'zh.wikipedia', name, birthday, age, height, cup, image });
+                    } catch (err) {
+                        resolve(null);
+                    }
+                },
+                onerror: () => resolve(null)
+            });
+        });
+    }
+
+    /**
+     * 从 XSList 搜索页面抓取女优信息。
+     * @param {string} name - 女优名称。
+     * @returns {Promise<Object|null>}
+     */
+    async function fetchFromXSList(name) {
         return new Promise((resolve) => {
             const url = 'https://xslist.org/search?query=' + encodeURIComponent(name);
 
@@ -635,6 +583,71 @@
         });
     }
 
+    /**
+     * 主函数：根据女优名称从多个来源抓取信息并合并。
+     * 使用 Promise.race + Promise.allSettled 策略。
+     * @param {string} name - 女优名称。
+     * @returns {Promise<Object>} 包含合并后的女优信息。
+     */
+    async function fetchActressInfoFromSources(name) {
+        const sources = [
+            fetchFromMissAV,
+            fetchFromWikipedia_ja,
+            fetchFromWikipedia_zh,
+            fetchFromXSList
+        ];
+
+        const wrappedFetches = sources.map(fn => async () => {
+            try {
+                const result = await fn(name);
+                return result ? { ...result, source: fn.name } : null;
+            } catch (err) {
+                console.warn(`来源错误: ${fn.name}`, err);
+                return null;
+            }
+        });
+
+        // === 1. Promise.race：优先拿到第一个成功的结果
+        const raceResult = await Promise.race(wrappedFetches.map(f => f()));
+
+        // 初始化合并结果，确保 image 至少有默认图
+        const merged = {
+            name,
+            source: raceResult ? raceResult.source : '',
+            birthday: raceResult?.birthday || null,
+            age: raceResult?.age || null,
+            height: raceResult?.height || null,
+            cup: raceResult?.cup || null,
+            image: (raceResult?.image && !_isDefaultImage(raceResult.image))
+                ? raceResult.image
+                : getDefaultImage(),
+        };
+
+        // === 2. Promise.allSettled：等所有结果返回，按优先级补全缺失字段
+        const settledResults = await Promise.allSettled(wrappedFetches.map(f => f()));
+        const validResults = settledResults
+            .filter(r => r.status === 'fulfilled' && r.value)
+            .map(r => r.value);
+
+        // 更新来源
+        merged.source = validResults.map(r => r.source).join(',');
+
+        for (const fn of sources) {
+            const r = validResults.find(item => item.source === fn.name);
+            if (!r) continue;
+
+            if (!merged.birthday && r.birthday) merged.birthday = r.birthday;
+            if (!merged.age && r.age) merged.age = r.age;
+            if (!merged.height && r.height) merged.height = r.height;
+            if (!merged.cup && r.cup) merged.cup = r.cup;
+            if ((!merged.image || _isDefaultImage(merged.image)) && r.image && !_isDefaultImage(r.image)) {
+                merged.image = r.image;
+            }
+        }
+
+        return merged;
+    }
+
     // 工具函数 start
 
     /**
@@ -671,6 +684,38 @@
     // 工具函数 end
 
     /**
+     * 根据一组女优姓名，依次尝试获取其信息，直到获取到包含年龄、身高、罩杯的完整信息。
+     * 成功后调用 updateProfile 渲染页面，否则提示失败信息。
+     *
+     * @param {string[]} names - 要尝试抓取信息的女优姓名列表。
+     */
+    async function fetchFromNameList(names) {
+        for (const [index, name] of names.entries()) {
+            try {
+                const info = await fetchActressInfoFromSources(name);
+                console.log(`[尝试第 ${index + 1} 个名称: ${name}]`, info);
+                // 判断是否满足“完整信息”（有年龄、身高、罩杯）
+                if (isCompleteInfo(info)) {
+                    console.log(`[成功获取女优信息🍉] ${name}`);
+                    return info;
+                }
+            } catch (err) {
+                console.warn(`[尝试 ${index + 1}/${names.length}] 失败:`, err);
+            }
+        }
+        throw new Error('所有来源均未能获取到完整信息');
+    }
+
+    /**
+     * 判断 info 对象是否包含完整信息（年龄、身高、罩杯）。
+     * @param info
+     * @returns {number|string|null|*|string}
+     */
+    function isCompleteInfo(info) {
+        return info.age && info.height && info.cup;
+    }
+
+    /**
      * 更新页面上 .profile 区块中的女优信息展示。
      * 会根据传入的 info 对象，动态替换头像、姓名、年龄、身高、罩杯字段内容。
      *
@@ -696,57 +741,18 @@
         `;
     }
 
-    /**
-     * 按顺序遍历给定的女优姓名列表，依次尝试从各信息源抓取数据。
-     * 若成功获取包含身高、年龄、罩杯的完整信息，则立即返回该信息；
-     * 若全部尝试后仍未获取到完整数据，则返回 null。
-     *
-     * @param {string[]} names - 女优姓名数组，按优先顺序排列。
-     * @returns {Promise<Object|null>} - 成功时返回包含完整字段的女优信息对象，否则返回 null。
-     */
-    async function fetchFromNameList(names) {
-        let count = 0;
-        for (const name of names) {
-            const info = await fetchActressInfoFromSources(name);
-            count++;
-            console.log(`[尝试第 ${count} 个名称: ${name}]`, info);
-            if (info.height || info.age || info.cup) {
-                console.log(`[成功获取女优🍉 ${names[count-1]} 的信息]`);
-                return info;
-            }
-        }
-
-        console.log(`共尝试 ${count} 个名称，未获取完整信息`);
-        return null;
-    }
-
-    /**
-     * 根据一组女优姓名，依次尝试获取其信息，直到获取到包含年龄、身高、罩杯的完整信息。
-     * 成功后调用 updateProfile 渲染页面，否则提示失败信息。
-     *
-     * @param {string[]} names - 要尝试抓取信息的女优姓名列表。
-     */
     fetchFromNameList(names)
-        /**
-         * 获取成功：控制台输出信息并更新页面上的 profile 区域。
-         * @type {Object} info - 获取到的女优信息对象。
-         */
         .then(info => {
             console.log('[女优信息]:', info);
             updateProfile(info);
         })
-        /**
-         * 获取失败：输出错误信息并在页面上显示错误提示。
-         * @type {Error} err - 捕获到的异常信息。
-         */
         .catch(err => {
             console.error('获取女优信息失败:', err);
             const profile = document.querySelector('.profile');
             if (!profile) return;
-
             profile.innerHTML = `
-                <h4 style="text-align: center;flex: 1;margin: 0;color: #000;font-size: 14px;">获取女优信息失败</h4>
-            `;
+            <h4 style="text-align: center;flex: 1;margin: 0;color: #000;font-size: 14px;">获取女优信息失败</h4>
+        `;
         });
 
 })()
