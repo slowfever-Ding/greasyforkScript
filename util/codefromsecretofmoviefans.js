@@ -14,7 +14,7 @@
 // @connect     xslist.org
 // @connect     av-wiki.net
 // @connect     www.xb1.com
-// @version     1.1.2
+// @version     1.1.3
 // @author      slowFever
 // @description 自动获取影迷的秘密中当前页面的神秘代码。
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=www.63h.net
@@ -1083,31 +1083,36 @@
 
             // 定义所有匹配规则
             const patterns = [
-                // 身高单独匹配：T / Height / 身長 / 身高, 可选冒号, 可选cm
                 {
+                    // 匹配身高：T / Height / 身長 / 身高，带可选冒号
                     re: /(?:T|Height|身長|身高)[:：]?\s*(\d{2,3})/i,
                     apply: (m) => { if (!height) height = +m[1]; }
                 },
-                // B/W 明确罩杯匹配，支持 B100(I) W60、B92(Oカップ) W56 或 B:90（H）W:67
                 {
-                    re: /B[:：]?\s*(\d{2,3})\s*[（(]?([A-Za-z])(?:カップ)?[)）]?\s*W[:：]?\s*(\d{2,3})/i,
+                    // 匹配 B/W 明确罩杯：B100(I) W60、B92(Oカップ) W56、B:90（H）W:67
+                    re: /B\s*[:：]?\s*(\d{2,3})\s*(?:cm)?\s*[（(]?([A-Za-z])(?:カップ)?[)）]?\s*W\s*[:：]?\s*(\d{2,3})\s*(?:cm)?/i,
                     apply: (m) => { bust = +m[1]; if (m[2]) cup = m[2].toUpperCase(); waist = +m[3]; }
                 },
-                // 三围: 100-60-100
                 {
-                    re: /三围[:：]?\s*(\d{2,3})-(\d{2,3})-(\d{2,3})/,
-                    apply: (m) => { bust = +m[1]; waist = +m[2]; }
+                    // 匹配三围数字格式：100-60-100 或 87 - 60 - 94 cm
+                    re: /三围[:：]?\s*(\d{2,3})\s*-\s*(\d{2,3})\s*-\s*(\d{2,3})/i,
+                    apply: m => { bust = +m[1]; waist = +m[2]; }
                 },
-                // 连字符日文风格: T162-B100-W69-H92
                 {
-                    re: /T(\d{2,3})-B(\d{2,3})-W(\d{2,3})(?:-H(\d{2,3}))?/i,
+                    // 日文连字符风格：T162-B100-W69-H92
+                    re: /T(\d{2,3})-B(\d{2,3})-W(\d{2,3})/i,
                     apply: (m) => { height = +m[1]; bust = +m[2]; waist = +m[3]; }
                 },
-                // 空格/斜杠分隔日文风格: T156 / B86(Dカップ) / W56 / H85
                 {
+                    // 日文斜杠/空格风格：T156 / B86(Dカップ) / W56 / H85
                     re: /T(\d{2,3})\s*\/?\s*B(\d{2,3})\s*\(?([A-Za-z])?(?:カップ)?\)?\s*\/?\s*W(\d{2,3})/i,
                     apply: (m) => { height = +m[1]; bust = +m[2]; if (m[3]) cup = m[3].toUpperCase(); waist = +m[4]; }
                 },
+                {
+                    // 日文空格风格，括号罩杯可选：T157 B86(E) W56 H89
+                    re: /T(\d{2,3})\s*B(\d{2,3})\s*\(?([A-Za-z])?(?:カップ)?\)?\s*W(\d{2,3})/i,
+                    apply: m => { height = +m[1]; bust = +m[2]; if (m[3]) cup = m[3].toUpperCase(); waist = +m[4]; }
+                }
             ];
 
             // 循环匹配规则
