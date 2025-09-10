@@ -13,7 +13,8 @@
 // @connect     zh.wikipedia.org
 // @connect     xslist.org
 // @connect     av-wiki.net
-// @version     1.1.0
+// @connect     www.xb1.com
+// @version     1.1.2
 // @author      slowFever
 // @description 自动获取影迷的秘密中当前页面的神秘代码。
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=www.63h.net
@@ -357,17 +358,8 @@
                                 }
                             }
 
-                            // 提取生日并计算年龄
-                            const birthdayMatch = infoText.match(/(\d{4}-\d{2}-\d{2})/);
-                            let birthday = null;
-                            let age = null;
-                            if (birthdayMatch) {
-                                birthday = birthdayMatch[1];
-                                const birthDate = new Date(birthday);
-                                const now = new Date();
-                                age = now.getFullYear() - birthDate.getFullYear();
-                                if (now < new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate())) age--;
-                            }
+                            // 使用 _parseBirthdayAndAge方法 提取生日并计算年龄
+                            const {birthday, age} = this._parseBirthdayAndAge(infoText);
 
                             resolve({
                                 source: 'missAV',
@@ -425,16 +417,10 @@
 
                                 // 出生日期和年龄，身高，罩杯
                                 if (/生年月日/.test(label)) {
-                                    birthday = value.replace(/\[.*?\]/g, '').trim();
-
-                                    const dateMatch = birthday.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-                                    if (dateMatch) {
-                                        const [_, y, m, d] = dateMatch;
-                                        const birthDate = new Date(+y, +m - 1, +d);
-                                        const now = new Date();
-                                        age = now.getFullYear() - birthDate.getFullYear();
-                                        if (now < new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate())) age--;
-                                    }
+                                    // 使用 _parseBirthdayAndAge方法 提取生日并计算年龄
+                                    const result = this._parseBirthdayAndAge(value);
+                                    birthday = result.birthday;
+                                    age = result.age;
                                 } else if (/身[長高]|体重/.test(label) && !/比|率/.test(label)) {
                                     const h = (label + value).match(/(\d{2,3})\s*(厘米|cm)/i);
                                     if (h) height = h[1];
@@ -490,16 +476,10 @@
 
                                 // 出生日期和年龄，身高，罩杯
                                 if (/出生|生年/.test(label)) {
-                                    birthday = value.replace(/\[.*?\]/g, '').trim();
-
-                                    const dateMatch = birthday.match(/(\d{4})[年\-](\d{1,2})[月\-](\d{1,2})/);
-                                    if (dateMatch) {
-                                        const [_, y, m, d] = dateMatch;
-                                        const birthDate = new Date(+y, +m - 1, +d);
-                                        const now = new Date();
-                                        age = now.getFullYear() - birthDate.getFullYear();
-                                        if (now < new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate())) age--;
-                                    }
+                                    // 使用 _parseBirthdayAndAge方法 提取生日并计算年龄
+                                    const result = this._parseBirthdayAndAge(value);
+                                    birthday = result.birthday;
+                                    age = result.age;
                                 } else if (/身[長高]|体重/.test(label) && !/比|率/.test(label)) {
                                     const h = (label + value).match(/(\d{2,3})\s*(厘米|cm)/i);
                                     if (h) height = h[1];
@@ -572,18 +552,10 @@
                                         ddEls.forEach(dd => {
                                             const text = dd.textContent.trim();
 
-                                            // 出生日期
-                                            const dateMatch = text.match(/(\d{4})[年\/-](\d{1,2})[月\/-](\d{1,2})/);
-                                            if (dateMatch) {
-                                                const [_, y, m, d] = dateMatch;
-                                                birthday = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-                                                const birthDate = new Date(+y, +m - 1, +d);
-                                                const now = new Date();
-                                                age = now.getFullYear() - birthDate.getFullYear();
-                                                if (now < new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate())) age--;
-                                            }
+                                            // 使用 _parseBirthdayAndAge方法 提取生日并计算年龄
+                                            ({ birthday, age } = self._parseBirthdayAndAge(text));
 
-                                            // 2. 三围 / 罩杯
+                                            // 三围 / 罩杯 / 身高
                                             // 只要这一行包含 T/B/W/H 格式就交给 parseBodySpecs
                                             if (/T\d{2,3}.*B\d{2,3}/i.test(text)) {
                                                 const { height: h, cup: c } = self._parseBodySpecs(text);
@@ -619,6 +591,116 @@
         }
 
         /**
+         * 从 xb1 抓取女优信息。
+         * @param {string} name - 女优名称。
+         * @returns {Promise<Object|null>}
+         */
+        async fetchFromXB1(name) {
+            return new Promise((resolve) => {
+                // https://www.xb1.com/search/%E6%AD%A6%E7%94%B0%E6%80%9C%E9%A6%99
+                const searchUrl = `https://www.xb1.com/search/${encodeURIComponent(name)}`;
+
+                const self = this; // 保存 this
+
+                GM_xmlhttpRequest({
+                    url: searchUrl,
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
+                        'Referer': 'https://www.xb1.com/',
+                    },
+                    onload: function (response) {
+                        // 检查HTTP响应状态码，如果不是200（成功）就返回null
+                        if (response.status !== 200) return resolve(null);
+
+                        try {
+                            // 解析返回的HTML文本
+                            const doc = new DOMParser().parseFromString(response.responseText, 'text/html');
+
+                            // 搜索结果页，找到所有演员条目链接
+                            const allLinks = doc.querySelectorAll('.r-text dt a');
+
+                            // 番号正则
+                            const codeRegex = /[A-Z]{2,5}-\d{2,5}/;
+
+                            // 过滤掉含番号的，并保留包含名字的
+                            const candidates = [...allLinks].filter(a => {
+                                const t = a.textContent.replace(/\s+/g, '');
+                                return !codeRegex.test(t) && t.includes(name);
+                            });
+
+                            // 优先找完全相等，没有就取第一个
+                            const link = candidates.find(a => a.textContent.replace(/\s+/g, '') === name) || candidates[0] || null;
+
+                            // 如果链接不存在，返回null
+                            if (!link) {
+                                return resolve(null);
+                            }
+
+                            // 拼接完整URL（相对路径转绝对路径）
+                            const fullUrl = new URL(link.getAttribute('href'), 'https://www.xb1.com').href;
+
+                            GM_xmlhttpRequest({
+                                url: fullUrl,
+                                method: 'GET',
+                                onload: function (res2) {
+                                    if (res2.status !== 200) return resolve(null);
+
+                                    try {
+                                        const doc2 = new DOMParser().parseFromString(res2.responseText, 'text/html');
+
+                                        // 从 meta 中提取资料
+                                        const descMeta = doc2.querySelector('meta[property="og:description"]');
+                                        const imgMeta = doc2.querySelector('meta[property="og:image"]');
+
+                                        // 解析基本资料字段
+                                        let birthday = null, age = null, height = null, cup = null, image = null;
+
+                                        if (descMeta) {
+                                            const desc = descMeta.getAttribute('content');
+
+                                            // 使用 _parseBirthdayAndAge方法 提取生日并计算年龄
+                                            ({ birthday, age } = self._parseBirthdayAndAge(desc));
+
+                                            // 使用 _parseBodySpecs 解析三围和罩杯, 身高
+                                            const bodySpecs = self._parseBodySpecs(desc);
+                                            if (bodySpecs.cup) cup = bodySpecs.cup;
+                                            if (bodySpecs.height) height = bodySpecs.height;
+                                        }
+
+                                        // 图片
+                                        if (imgMeta) {
+                                            image = imgMeta.getAttribute('content');
+                                        }
+
+                                        resolve({
+                                            source: 'xb1',
+                                            name,
+                                            birthday,
+                                            age,
+                                            height,
+                                            cup,
+                                            image
+                                        });
+                                    } catch (err) {
+                                        console.warn('解析 xb1 详情页失败:', err);
+                                        resolve(null);
+                                    }
+                                },
+                                onerror: () => resolve(null)
+                            });
+                        } catch (err) {
+                            console.warn('解析 xb1 搜索页失败:', err);
+                            resolve(null);
+                        }
+                    },
+                    onerror: () => resolve(null)
+                })
+            })
+        }
+
+        /**
          * 从 XSList 搜索页面抓取女优信息。
          * @param {string} name - 女优名称。
          * @returns {Promise<Object|null>}
@@ -630,7 +712,7 @@
                 GM_xmlhttpRequest({
                     method: 'GET',
                     headers: {
-                        'Cookie': 'cf_clearance=o6H5dOQSOaguBzjxLgqprMKO4_E8YgLmMHtNnC5fbSA-1749105768-1.2.1.1-4Ty7OrT.Z_2VVJ5vHLUXoWJNmhskKKA6JXRLjxYlsgsQMVQ0kqRxTAHIHbylHnV7rZ4X4dBlsQR11UIixNkOgu_xTpnRw6VTDK1.0fm.rA0XNvFosogudw8AiQLN0DTBX51hu4ttwe9oSQtqxk9kf3Lo49apAE_hUoPMrbZmP92TwVRXWfMxtH1a6vqwPOVxaS3CmBP42qMceEqSdXhIh.b7lQhXzKF.n.Tvx0hdF41Fm6X1MzC7OiANRBJSY92Yc.DBNiJ6CxbJBiEYAGCAt3_f9IhAypcqxdSb3i.YR3.KwH8AeeELCQGbUa1_5o7YDZlEINYMeiCo1tuvq7aGzCc7Y3TjGKNzIZ0HABGXpNgMSjJce.UzfPxQISSzlK7R', // 替换为最新值
+                        'Cookie': 'cf_clearance=fptXTTN8FE.IY1htTYY3SxpXotCz2.gl2e1DyEhKxRI-1757420495-1.2.1.1-aaDzvjJSdM4WMTGYmYajnHvBt2rszcNkz3i46vDgb.P4QWMvGiTeAD8PZ9T0Reknd_80f12bJb45_.VE1t8FHI0uhw80b29roBSwypFBmCCp6aLuC3seR8AIHgi.w2k6MJGkOLoUOZdnERczCgqkNho70AfX5_V.Z90cMeWqDoS8Henis_aNLsD4wZE9TsDUkpm54UpflRcB9ZU5C5oLFv0ga0kgVnO0ufdqEuGomYg', // 替换为最新值
                     },
                     url,
                     onload: (response) => {
@@ -653,19 +735,8 @@
 
                             const text = p.textContent;
 
-                            // 生日
-                            let birthday = null;
-                            let age = null;
-                            const birthdayMatch = text.match(/born on (\d{1,2})\/(\d{1,2})\/(\d{4})/);
-                            if (birthdayMatch) {
-                                const [_, m, d, y] = birthdayMatch;
-                                birthday = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-
-                                const birthDate = new Date(+y, +m - 1, +d);
-                                const now = new Date();
-                                age = now.getFullYear() - birthDate.getFullYear();
-                                if (now < new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate())) age--;
-                            }
+                            // 使用 _parseBirthdayAndAge方法 提取生日并计算年龄
+                            const { birthday, age } = this._parseBirthdayAndAge(text);
 
                             // 身高
                             const heightMatch = text.match(/Measurements:.*?B(\d{2,3})/);
@@ -719,6 +790,7 @@
                 this.fetchFromWikipedia_ja.bind(this),
                 this.fetchFromWikipedia_zh.bind(this),
                 this.fetchFromAvWikiInfo.bind(this),
+                this.fetchFromXB1.bind(this),
                 this.fetchFromXSList.bind(this)
             ];
 
@@ -932,71 +1004,141 @@
         }
 
         /**
-         * 解析女优身体数据，提取身高、胸围、下胸围和罩杯。
+         * 解析生日和年龄信息
          *
-         * 支持格式示例：
-         *   "T158 / B98(Hカップ) / W63 / H93"
-         *   "身長:160cm, B85, W58"
+         * 支持多种日期格式：
+         * 1. YYYY-MM-DD (如 "2020-05-12")
+         * 2. YYYY/MM/DD (如 "2020/05/12")
+         * 3. 中文日期格式 (如 "2020年5月12日")
+         * 4. 英文格式 (如 "born on 05/12/2020")
          *
-         * - 优先使用字符串中已有的罩杯
-         * - 若未提供罩杯，则根据胸围与下胸围或经验值推算
-         * - 罩杯映射遵循 JIS/日本标准，每 2.5cm 一档（A-Z）
+         * 会自动计算当前年龄（基于当前日期）
          *
-         * @param {string} raw - 原始身体数据字符串
-         * @returns {{
-         *   height?: number,     // 身高（cm）
-         *   bust?: number,       // 上胸围（cm）
-         *   underbust?: number,  // 下胸围（cm）
-         *   cup?: string         // 罩杯（A-Z）
-         * }}
+         * @param {string} text - 包含生日信息的文本
+         * @returns {Object} 包含以下字段的对象:
+         *   - birthday {string|null} 格式化的生日(YYYY-MM-DD)，解析失败返回null
+         *   - age {number|null} 计算出的年龄，解析失败返回null
+         */
+        _parseBirthdayAndAge(text) {
+            let birthday = null;
+            let age = null;
+
+            // 常见的日期格式正则
+            const patterns = [
+                /(\d{4})-(\d{1,2})-(\d{1,2})/, // 2020-05-12
+                /(\d{4})\/(\d{1,2})\/(\d{1,2})/, // 2020/05/12
+                /(\d{4})年(\d{1,2})月(\d{1,2})日?/, // 2020年5月12日
+                /born on (\d{1,2})\/(\d{1,2})\/(\d{4})/, // born on 05/12/2020
+            ];
+
+            for (const re of patterns) {
+                const m = text.match(re);
+                if (m) {
+                    let y, mth, d;
+                    if (re === patterns[3]) {
+                        // born on MM/DD/YYYY
+                        [ , mth, d, y ] = m;
+                    } else {
+                        [ , y, mth, d ] = m;
+                    }
+
+                    // 格式化日期 YYYY-MM-DD
+                    birthday = `${y}-${String(mth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+                    // 计算年龄
+                    const birthDate = new Date(+y, +mth - 1, +d);
+                    const now = new Date();
+                    age = now.getFullYear() - birthDate.getFullYear();
+                    if (now < new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate())) {
+                        age--;
+                    }
+                    break;
+                }
+            }
+
+            return { birthday, age };
+        }
+
+        /**
+         * 解析身体规格数据（身高、胸围、腰围、罩杯）
+         *
+         * 支持多种格式：
+         * 1. 身高单独匹配：T / Height / 身長 / 身高 (如 "T160" 或 "身高: 165cm")
+         * 2. B/W罩杯格式：B100(I) W60 或 B92(Oカップ) W56
+         * 3. 三围格式：100-60-100 或 三围: 90-60-90
+         * 4. 日式连字符格式：T162-B100-W69-H92
+         * 5. 日式斜杠格式：T156 / B86(Dカップ) / W56 / H85
+         *
+         * 当未明确罩杯时，会根据胸围和腰围自动估算罩杯尺寸
+         *
+         * @param {string} raw - 包含身体规格的原始字符串
+         * @returns {Object} 解析结果对象，可能包含:
+         *   - height {number} 身高(cm)
+         *   - bust {number} 胸围(cm)
+         *   - waist {number} 腰围(cm)
+         *   - cup {string} 罩杯尺寸(大写字母)
          */
         _parseBodySpecs(raw = "") {
-            // 正则：身高 / 胸围 / 下胸围 / 腰围
-            const re = /(?:\b(?:T|Height|身長|身高)[:：]?\s*(\d{2,3})(?:\s*cm)?)|(?:\bB[:：]?\s*(\d{2,3})(?:\(([A-Za-z])カップ\))?)|(?:\bW[:：]?\s*(\d{2,3}))/gi;
+            let height = null, bust = null, waist = null, cup = null;
 
-            let h, bust, under, cup;
-            let m;
-            while ((m = re.exec(raw))) {
-                if (m[1]) {
-                    h = +m[1]; // 身高
-                } else if (m[2]) {
-                    bust = +m[2]; // 上胸围
-                    if (m[3]) cup = m[3]; // 已明确写了罩杯
-                } else if (m[4]) {
-                    under = +m[4]; // 下胸围
+            // 定义所有匹配规则
+            const patterns = [
+                // 身高单独匹配：T / Height / 身長 / 身高, 可选冒号, 可选cm
+                {
+                    re: /(?:T|Height|身長|身高)[:：]?\s*(\d{2,3})/i,
+                    apply: (m) => { if (!height) height = +m[1]; }
+                },
+                // B/W 明确罩杯匹配，支持 B100(I) W60、B92(Oカップ) W56 或 B:90（H）W:67
+                {
+                    re: /B[:：]?\s*(\d{2,3})\s*[（(]?([A-Za-z])(?:カップ)?[)）]?\s*W[:：]?\s*(\d{2,3})/i,
+                    apply: (m) => { bust = +m[1]; if (m[2]) cup = m[2].toUpperCase(); waist = +m[3]; }
+                },
+                // 三围: 100-60-100
+                {
+                    re: /三围[:：]?\s*(\d{2,3})-(\d{2,3})-(\d{2,3})/,
+                    apply: (m) => { bust = +m[1]; waist = +m[2]; }
+                },
+                // 连字符日文风格: T162-B100-W69-H92
+                {
+                    re: /T(\d{2,3})-B(\d{2,3})-W(\d{2,3})(?:-H(\d{2,3}))?/i,
+                    apply: (m) => { height = +m[1]; bust = +m[2]; waist = +m[3]; }
+                },
+                // 空格/斜杠分隔日文风格: T156 / B86(Dカップ) / W56 / H85
+                {
+                    re: /T(\d{2,3})\s*\/?\s*B(\d{2,3})\s*\(?([A-Za-z])?(?:カップ)?\)?\s*\/?\s*W(\d{2,3})/i,
+                    apply: (m) => { height = +m[1]; bust = +m[2]; if (m[3]) cup = m[3].toUpperCase(); waist = +m[4]; }
+                },
+            ];
+
+            // 循环匹配规则
+            for (const { re, apply } of patterns) {
+                const match = raw.match(re);
+                if (match) {
+                    apply(match);
                 }
             }
 
-            // 如果没写罩杯 → 尝试计算
+            console.log("明确罩杯: ", cup);
+
+            // 如果没有明确罩杯，但有 bust 和 waist，尝试估算
             if (!cup && bust) {
-                let underGuess = under;
-
-                // 没有下胸围 → 根据 bust 动态估算
-                if (!underGuess) {
-                    // 假设平均差值 ~15cm，向下取 5 的倍数（60/65/70...）
-                    underGuess = Math.round((bust - 15) / 5) * 5;
-                    // 下限保护
-                    if (underGuess < 60) underGuess = 60;
-                }
-
+                let underGuess = waist ? waist + 10 : bust - 15; // 经验公式
+                console.log(underGuess);
+                underGuess = Math.max(underGuess, 60); // 下限保护
                 const diff = bust - underGuess;
-
-                // 罩杯映射（JIS/日本标准，每 2.5cm 一档）
                 const cupSizes = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
                 const index = Math.round((diff - 10) / 2.5); // A=10cm起点
-                if (index >= 0 && index < cupSizes.length) {
-                    cup = cupSizes[index];
-                }
+                if (index >= 0 && index < cupSizes.length) cup = cupSizes[index];
             }
 
-            console.log('解析三围数据:', raw, { height: h, bust, underbust: under, cup });
+            console.log('解析三围数据:', raw, { height, bust, waist, cup });
 
             // 返回结果
             const res = {};
-            if (h) res.height = h;
+            if (height) res.height = height;
             if (bust) res.bust = bust;
-            if (under) res.underbust = under;
-            if (cup) res.cup = cup; // 优先使用明确提供的，否则计算结果
+            if (waist) res.waist = waist;
+            if (cup) res.cup = cup;
             return res;
         }
         // 辅助函数 end
