@@ -14,7 +14,7 @@
 // @connect     xslist.org
 // @connect     av-wiki.net
 // @connect     www.xb1.com
-// @version     1.1.3
+// @version     1.1.4
 // @author      slowFever
 // @description 自动获取影迷的秘密中当前页面的神秘代码。
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=www.63h.net
@@ -1112,6 +1112,16 @@
                     // 日文空格风格，括号罩杯可选：T157 B86(E) W56 H89
                     re: /T(\d{2,3})\s*B(\d{2,3})\s*\(?([A-Za-z])?(?:カップ)?\)?\s*W(\d{2,3})/i,
                     apply: m => { height = +m[1]; bust = +m[2]; if (m[3]) cup = m[3].toUpperCase(); waist = +m[4]; }
+                },
+                {
+                    // 匹配 “Ｂ/Ｗ/Ｈ”：Ｂ88cm Ｗ61cm Ｈ88cm
+                    re: /[BＢ]\s*(\d{2,3})\s*cm?\s*[WＷ]\s*(\d{2,3})\s*cm?/i,
+                    apply: (m) => { bust = +m[1]; waist = +m[2]; }
+                },
+                {
+                    // 匹配 B90cm（Fcup）-W62cm-H91cm 这种格式
+                    re: /B\s*(\d{2,3})\s*cm?\s*[（(]?([A-Za-z])(?:cup)?[)）]?\s*-\s*W\s*(\d{2,3})/i,
+                    apply: (m) => { bust = +m[1]; cup = m[2].toUpperCase(); waist = +m[3]; }
                 }
             ];
 
