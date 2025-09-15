@@ -14,7 +14,7 @@
 // @connect     xslist.org
 // @connect     av-wiki.net
 // @connect     www.xb1.com
-// @version     1.1.4
+// @version     1.1.5
 // @author      slowFever
 // @description 自动获取影迷的秘密中当前页面的神秘代码。
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=www.63h.net
@@ -1099,6 +1099,11 @@
                     apply: m => { bust = +m[1]; waist = +m[2]; }
                 },
                 {
+                    // 匹配 "三围: B88 / W59 / H90" 或 "B88-W59-H90"
+                    re: /三围[:：]?\s*B(\d{2,3})\s*[\/-]\s*W(\d{2,3})\s*[\/-]\s*H(\d{2,3})/i,
+                    apply: (m) => { bust = +m[1]; waist = +m[2]; }
+                },
+                {
                     // 日文连字符风格：T162-B100-W69-H92
                     re: /T(\d{2,3})-B(\d{2,3})-W(\d{2,3})/i,
                     apply: (m) => { height = +m[1]; bust = +m[2]; waist = +m[3]; }
@@ -1137,13 +1142,13 @@
 
             // 如果没有明确罩杯，但有 bust 和 waist，尝试估算
             if (!cup && bust) {
-                let underGuess = waist ? waist + 10 : bust - 15; // 经验公式
-                console.log(underGuess);
-                underGuess = Math.max(underGuess, 60); // 下限保护
+                let underGuess = waist ? waist + 10 : bust * 0.85; // 经验公式
+                console.log("估算下胸围:", underGuess);
+                underGuess = Math.max(60, Math.min(100, Math.round(underGuess))); // 限制在60-100cm范围
                 const diff = bust - underGuess;
                 const cupSizes = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
                 const index = Math.round((diff - 10) / 2.5); // A=10cm起点
-                if (index >= 0 && index < cupSizes.length) cup = cupSizes[index];
+                if (index >= 0 && index < cupSizes.length) cup = cupSizes[index] + " (估算) ";
             }
 
             console.log('解析三围数据:', raw, { height, bust, waist, cup });
