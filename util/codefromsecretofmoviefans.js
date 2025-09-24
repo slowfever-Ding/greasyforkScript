@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        获取影迷的秘密中的神秘代码
+// @name        提取各类影迷网站页面中的神秘代码
 // @namespace   http://tampermonkey.net/
 // @match       *://63h.net/*
 // @match       *://www.63h.net/*
@@ -44,9 +44,9 @@
 // @connect     xslist.org
 // @connect     av-wiki.net
 // @connect     www.xb1.com
-// @version     1.1.6
+// @version     1.1.7
 // @author      slowFever
-// @description 自动获取影迷的秘密中当前页面的神秘代码。
+// @description 自动提取当前页面中的神秘代码，并显示演员信息，适用于各类影迷相关网站。
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=www.succai.com
 // @license     MIT
 // ==/UserScript==
@@ -429,45 +429,19 @@
                             const root = doc.querySelector('.hero-pattern');
                             if (!root) return resolve(null);
 
+                            let birthday = null, age = null, height = null, cup = null, image = null;
+
                             // 获取图片、姓名和信息文本节点
-                            const image = root.querySelector('img')?.src || null;
+                            const imgEl = root.querySelector('img')?.src || null;
+                            if (imgEl) image = imgEl;
                             const actressName = root.querySelector('h4')?.textContent?.trim() || name;
                             const infoText = root.querySelector('.text-nord9')?.innerText?.trim().replace(/\s+/g, ' ') || '';
 
-                            // 提取身高
-                            const heightMatch = infoText.match(/(\d{3})cm/);
-                            const height = heightMatch ? heightMatch[1] : null;
-
-                            // 提取三围和罩杯
-                            const bwhMatch = infoText.match(/(\d{2,3})([A-G])?\s*-\s*(\d{2,3})\s*-\s*(\d{2,3})/i);
-
-                            let cup = null;
-                            if (bwhMatch) {
-                                const bustNum = parseInt(bwhMatch[1], 10);
-                                const cupLetter = bwhMatch[2]?.toUpperCase() || null;
-                                const waistNum = parseInt(bwhMatch[3], 10);
-
-                                if (cupLetter) {
-                                    cup = cupLetter;
-                                } else {
-                                    // 根据胸围与腰围差值推算罩杯大小
-                                    const diff = bustNum - waistNum;
-                                    const cupMapping = [
-                                        { min: 23, cup: 'G' },
-                                        { min: 20, cup: 'F' },
-                                        { min: 17, cup: 'E' },
-                                        { min: 14, cup: 'D' },
-                                        { min: 11, cup: 'C' },
-                                        { min: 8,  cup: 'B' },
-                                        { min: 5,  cup: 'A' }
-                                    ];
-                                    const matched = cupMapping.find(({ min }) => diff >= min);
-                                    cup = matched ? matched.cup : null;
-                                }
-                            }
-
                             // 使用 _parseBirthdayAndAge方法 提取生日并计算年龄
-                            const {birthday, age} = this._parseBirthdayAndAge(infoText);
+                            ({birthday, age} = this._parseBirthdayAndAge(infoText));
+
+                            // 使用 _parseBodySpecs 解析三围和罩杯, 身高
+                            ({height, cup} = this._parseBodySpecs(infoText));
 
                             resolve({
                                 source: 'missAV',
@@ -982,27 +956,42 @@
             };
         }
 
-        // 工具：把文本中的番号、图片等信息转为可用值
+        /**
+         * 判断 info 对象是否包含完整信息（年龄、身高、罩杯）。
+         * @param info
+         * @returns {boolean}
+         */
         isCompleteInfo(info) {
             return info && info.age && info.height && info.cup;
         }
 
-        // 主流程：尝试用名称列表逐个获取完整信息
+        /**
+         * 从给定的名字列表中异步获取女优信息。
+         *
+         * @param {Array<string>} names - 包含女优姓名的字符串数组。
+         * @returns {Promise<Object>} - 返回获取到的女优信息对象。如果所有尝试失败，返回默认数据。
+         *
+         * 过程说明：
+         * - 尝试从多个来源获取每个名字的详细信息。
+         * - 若成功获取完整信息，则立即返回。
+         * - 若获取不完整，则记录错误信息并继续尝试。
+         * - 若所有尝试均失败，则返回已有最完整的结果或默认数据。
+         */
         async fetchFromNameList(names) {
 
-            const errors = [];      // 收集所有错误用于调试
-            const candidates = [];  // 保存每个名字的合并结果
+            const errors = []; // 收集所有错误用于调试
+            const candidates = []; // 保存每个名字的合并结果
 
             for (const [index, name] of names.entries()) {
                 try {
+                    console.log(`%c[开始尝试第 ${index + 1} 个名称: ${name}]`, 'background: #f25a47; color: white;');
                     const info = await this.fetchActressInfoFromSources(name);
-                    console.log(`[尝试第 ${index + 1} 个名称: ${name}]`, info);
 
                     // 收集每个名字的结果
                     candidates.push(info);
 
                     if (this.isCompleteInfo(info)) {
-                        console.log('[成功获取女优信息🍉]', name);
+                        console.log(`%c[成功获取${name}信息]`, 'background: #43b244; color: white;');
                         return info; // 成功时直接返回
                     }
 
@@ -1235,6 +1224,16 @@
                     // 匹配 B90cm（Fcup）-W62cm-H91cm 这种格式
                     re: /B\s*(\d{2,3})\s*cm?\s*[（(]?([A-Za-z])(?:cup)?[)）]?\s*-\s*W\s*(\d{2,3})/i,
                     apply: (m) => { bust = +m[1]; cup = m[2].toUpperCase(); waist = +m[3]; }
+                },
+                {
+                    // 匹配 "158cm / 35F - 24 - 35" 或者 "158cm/35F-24-35"
+                    re: /(\d{3})cm\s*\/\s*(\d{2,3})([A-Za-z])?\s*-\s*(\d{2,3})\s*-\s*(\d{2,3})/i,
+                    apply: (m) => { height = +m[1]; bust = +m[2]; if (m[3]) cup = m[3].toUpperCase(); waist = +m[4]; }
+                },
+                {
+                    // 匹配 "31C - 21 - 32" 或者 "31C-21-32"
+                    re: /(\d{1,3})([A-Za-z])\s*-\s*(\d{2,3})\s*-\s*(\d{2,3})/i,
+                    apply: (m) => { bust = +m[1]; cup = m[2].toUpperCase(); waist = +m[3]; }
                 }
             ];
 
@@ -1259,7 +1258,7 @@
                 if (index >= 0 && index < cupSizes.length) cup = cupSizes[index] + " (估算) ";
             }
 
-            console.log('解析三围数据:', raw, { height, bust, waist, cup });
+            console.log('%c解析三围数据:', 'background: #209cee; color: white;', raw, { height, bust, waist, cup });
 
             // 返回结果
             const res = {};
@@ -1309,7 +1308,7 @@
             this.createToggleButton();
             this.setupCopyLogic();
 
-            console.log('调试信息:', {
+            console.log('面板信息:', {
                 "panel": this.panel,
                 "toggleBtn": this.toggleBtn,
                 "panelVisible": this.panelVisible
@@ -1318,7 +1317,7 @@
             // 5) 抓取并更新信息
             this.fetchFromNameList(this.names)
                 .then(info => {
-                    console.log('[女优信息]:', info);
+                    console.log('[女优信息🕵️]:', info);
                     this.updateProfile(info);
                 })
                 .catch(err => {
@@ -1326,10 +1325,10 @@
                     const profile = document.querySelector('.profile');
                     if (profile) {
                         profile.innerHTML = `
-                      <h4 style="text-align: center; color: #000; font-size: 14px; margin: 0;">
-                        获取女优信息失败
-                      </h4>
-                    `;
+                          <h4 style="text-align: center; color: #000; font-size: 14px; margin: 0;">
+                            获取女优信息失败
+                          </h4>
+                        `;
                     }
                 });
         }
