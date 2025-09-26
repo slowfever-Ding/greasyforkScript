@@ -44,7 +44,8 @@
 // @connect     xslist.org
 // @connect     av-wiki.net
 // @connect     www.xb1.com
-// @version     1.1.7
+// @connect     www.javrate.com
+// @version     1.1.8
 // @author      slowFever
 // @description 自动提取当前页面中的神秘代码，并显示演员信息，适用于各类影迷相关网站。
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=www.succai.com
@@ -783,6 +784,110 @@
         }
 
         /**
+         * 从 javrate 抓取女优信息。
+         * @param {string} name - 女优名称。
+         * @returns {Promise<Object|null>}
+         */
+        async fetchFromJavrate(name) {
+            return new Promise((resolve) => {
+                // https://www.javrate.com/search/%E5%A5%B3%E5%84%AA/%E6%AD%A6%E7%94%B0%E6%80%9C%E9%A6%99
+                const searchUrl = `https://www.javrate.com/search/%E5%A5%B3%E5%84%AA/${encodeURIComponent(name)}`;
+
+                const self = this; // 保存 this
+
+                GM_xmlhttpRequest({
+                    url: searchUrl,
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+                        'Referer': 'https://www.javrate.com/',
+                    },
+                    onload: function (response) {
+                        if (response.status !== 200) return resolve(null);
+
+                        try {
+                            const doc = new DOMParser().parseFromString(response.responseText, 'text/html');
+
+                            // 搜索结果页，找到演员列表
+                            const actorListEle = doc.querySelector('.body-root > .search-container > .actor-results.grid-view');
+
+                            // 如果没有找到演员列表，或者列表为空，返回null
+                            if (actorListEle.children.length === 0 && actorListEle.innerHTML.trim() === '') resolve(null);
+
+                            // 取第一个演员项
+                            const firstActorLink = actorListEle.firstElementChild;
+
+                            // 如果没有找到，返回null
+                            if (!firstActorLink) return resolve(null);
+
+                            // 拼接完整URL（相对路径转绝对路径）
+                            const fullUrl = new URL(firstActorLink.getAttribute('href'), 'https://www.javrate.com/').href;
+
+                            // 进入演员详情页
+                            GM_xmlhttpRequest({
+                                url: fullUrl,
+                                method: 'GET',
+                                onload: function (res2) {
+                                    if (res2.status !== 200) return resolve(null);
+
+                                    try {
+                                        const doc2 = new DOMParser().parseFromString(res2.responseText, 'text/html');
+
+                                        // 取得演员信息区域
+                                        const actorInfo = doc2.querySelector('.actor-info > article.actor-info-box');
+
+                                        // 解析基本资料字段
+                                        let birthday = null, age = null, height = null, cup = null, image = null;
+
+                                        // 女优头像照片
+                                        const imgEl = actorInfo.firstElementChild.querySelector('div > img');
+                                        if (imgEl) image = imgEl.src;
+
+                                        // 演员详细信息
+                                        const infoRows = actorInfo.querySelector('section');
+
+                                        // 生日 & 年龄
+                                        const birthdayRow = self._findRowByTitle(infoRows, "生日");
+                                        if (birthdayRow) {
+                                            birthday = birthdayRow.querySelector('h4')?.textContent.trim();
+                                            age = self._extractNumber(birthdayRow.querySelector('span')?.textContent.trim());
+                                        }
+
+                                        // 身高
+                                        const heightRow = self._findRowByTitle(infoRows, "身長");
+                                        if (heightRow) height = self._extractNumber(heightRow.querySelector('h4')?.textContent.trim());
+
+                                        // 罩杯
+                                        const cupRow = self._findRowByTitle(infoRows, "罩杯");
+                                        if (cupRow) cup = cupRow.querySelector('h4')?.textContent.trim();
+
+                                        resolve({
+                                            source: 'javrate',
+                                            name,
+                                            birthday,
+                                            age,
+                                            height,
+                                            cup,
+                                            image
+                                        });
+                                    } catch (err) {
+                                        console.warn('解析 javrate 详情页失败:', err);
+                                        resolve(null);
+                                    }
+                                },
+                                onerror: () => resolve(null)
+                            });
+                        } catch (err) {
+
+                        }
+                    },
+                    onerror: () => resolve(null)
+                })
+            });
+        }
+
+        /**
          * 从 XSList 搜索页面抓取女优信息。
          * @param {string} name - 女优名称。
          * @returns {Promise<Object|null>}
@@ -873,6 +978,7 @@
                 this.fetchFromWikipedia_zh.bind(this),
                 this.fetchFromAvWikiInfo.bind(this),
                 this.fetchFromXB1.bind(this),
+                this.fetchFromJavrate.bind(this),
                 this.fetchFromXSList.bind(this)
             ];
 
@@ -1284,6 +1390,27 @@
             }
             console.warn("未找到匹配的站点配置:", host);
             return null;
+        }
+
+        /**
+         * 在指定的 section 中查找包含指定关键字的 row 元素
+         * @param {Element} section 容器元素
+         * @param {string} keyword 关键字
+         * @returns 返回匹配到的元素或 undefined
+         */
+        _findRowByTitle(section, keyword) {
+            return Array.from(section.querySelectorAll('.row'))
+                .find(row => row.querySelector('h3')?.textContent.includes(keyword));
+        }
+
+        /**
+         * 字符串转数字
+         * @param {string} str 输入字符串
+         * @returns {number|null} 整数或 null
+         */
+        _extractNumber(str) {
+            const match = str.match(/\d+/);
+            return match ? parseInt(match[0], 10) : null;
         }
         // 辅助函数 end
 
