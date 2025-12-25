@@ -45,7 +45,7 @@
 // @connect     av-wiki.net
 // @connect     www.xb1.com
 // @connect     www.javrate.com
-// @version     1.1.9
+// @version     1.2.0
 // @author      slowFever
 // @description 自动提取当前页面中的神秘代码，并显示演员信息，适用于各类影迷相关网站。
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=www.succai.com
@@ -968,46 +968,82 @@
          */
         async fetchActressInfoFromSources(names) {
 
-            // 参数标准化
             const nameList = Array.isArray(names) ? names : [names];
 
-            // 数据源配置
             const sources = [
                 this.fetchFromMissAV.bind(this),
+                this.fetchFromJavrate.bind(this),
                 this.fetchFromWikipedia_ja.bind(this),
                 this.fetchFromWikipedia_zh.bind(this),
                 this.fetchFromAvWikiInfo.bind(this),
                 this.fetchFromXB1.bind(this),
-                this.fetchFromJavrate.bind(this),
                 this.fetchFromXSList.bind(this)
             ];
 
-            // 逐个名字尝试查询
+            console.group('[fetchActressInfoFromSources] START');
+            console.log('待查询名字列表:', nameList);
+
             for (const name of nameList) {
+
+                console.group(`👤 查询名字: ${name}`);
+                console.time(`⏱ ${name} 总耗时`);
+
                 try {
-                    // 并行请求
-                    const promises = sources.map(fn =>
-                        // 添加数据源标识
-                        fn(name)
-                            // 自动提取方法名作为数据源标识（如 "fetchFromMissAV" → "MissAV"）
-                            .then(result => result ? { ...result, source: result.source || fn.name.replace('fetchFrom','') } : null)
-                            // 错误处理：静默捕获单个数据源错误不影响整体流程
-                            .catch(err => {
-                                console.warn(`[${name}] 来源错误: ${fn.name}`, err);
-                                return null;
-                            })
+
+                    const settledResults = await Promise.allSettled(
+                        sources.map(fn => {
+
+                            const sourceName = fn.name
+                                .replace('bound ', '')
+                                .replace('fetchFrom', '');
+
+                            console.log(`➡️ [${name}] 调用数据源: ${sourceName}`);
+
+                            // ⚠️ 核心：所有数据源都包一层超时保护
+                            return this._withTimeout(
+                                fn(name)
+                                    .then(result => {
+                                        if (!result) {
+                                            console.warn(`⚠️ [${name}] ${sourceName} 返回 null`);
+                                            return null;
+                                        }
+
+                                        console.log(`✅ [${name}] ${sourceName} 成功`, result);
+
+                                        return {
+                                            ...result,
+                                            source: result.source || sourceName
+                                        };
+                                    })
+                                    .catch(err => {
+                                        console.error(`❌ [${name}] ${sourceName} 抛错`, err);
+                                        return null;
+                                    }),
+                                15000, // ⏱ 超时 15 秒
+                                sourceName,
+                                name
+                            );
+                        })
                     );
 
-                    // 等待所有请求完成，过滤掉失败的结果
-                    const results = (await Promise.all(promises)).filter(r => r);
-                    console.log(`[${name}] 有效数据源结果: `, results);
+                    console.log(`📦 [${name}] allSettled 原始结果:`, settledResults);
 
-                    // 当前名字查不到 → 尝试下一个名字
-                    if (!results.length) continue;
+                    const results = settledResults
+                        .filter(r => r.status === 'fulfilled' && r.value)
+                        .map(r => r.value);
 
-                    // 初始化合并对象（确保所有字段存在）
+                    console.log(`🎯 [${name}] 有效结果数量: ${results.length}`);
+                    console.table(results);
+
+                    if (!results.length) {
+                        console.warn(`🚫 [${name}] 所有数据源无结果，尝试下一个名字`);
+                        console.timeEnd(`⏱ ${name} 总耗时`);
+                        console.groupEnd();
+                        continue;
+                    }
+
                     const merged = {
-                        name: name,
+                        name,
                         source: '',
                         birthday: null,
                         age: null,
@@ -1016,41 +1052,68 @@
                         image: null
                     };
 
-                    // 按数据源优先级补全字段
+                    console.group(`🧩 [${name}] 合并字段`);
+
                     for (const r of results) {
-                        /* 图片合并策略：
-                         * 1. 一旦获取到有效图片就固定（遵循优先级）
-                         * 2. 使用_isDefaultImage排除占位图
-                         */
+
+                        console.group(`来源: ${r.source}`);
+
                         if (!merged.image && r.image && !this._isDefaultImage(r.image)) {
                             merged.image = r.image;
+                            console.log('🖼 image ←', r.image);
                         }
 
-                        /* 文字字段合并策略：
-                         * 1. 非覆盖式填充（已有值不更新）
-                         * 2. 按数据源优先级自动选择
-                         */
-                        if (!merged.birthday && r.birthday) merged.birthday = r.birthday;
-                        if (!merged.age && r.age) merged.age = r.age;
-                        if (!merged.height && r.height) merged.height = r.height;
-                        if (!merged.cup && r.cup) merged.cup = r.cup;
+                        if (!merged.birthday && r.birthday) {
+                            merged.birthday = r.birthday;
+                            console.log('🎂 birthday ←', r.birthday);
+                        }
+
+                        if (!merged.age && r.age) {
+                            merged.age = r.age;
+                            console.log('🔢 age ←', r.age);
+                        }
+
+                        if (!merged.height && r.height) {
+                            merged.height = r.height;
+                            console.log('📏 height ←', r.height);
+                        }
+
+                        if (!merged.cup && r.cup) {
+                            merged.cup = r.cup;
+                            console.log('👙 cup ←', r.cup);
+                        }
+
+                        console.groupEnd();
                     }
 
-                    // 合并数据源标识（去重后逗号分隔）
+                    console.groupEnd();
+
                     merged.source = [...new Set(results.map(r => r.source))].join(',');
 
-                    // 图片兜底逻辑：当所有来源都无有效图片时使用默认图
-                    if (!merged.image) merged.image = this.getDefaultImage();
+                    if (!merged.image) {
+                        merged.image = this.getDefaultImage();
+                        console.warn('🖼 使用默认图片');
+                    }
 
-                    // 返回首个成功的合并结果
+                    console.log(`✅ [${name}] 最终合并结果`, merged);
+
+                    console.timeEnd(`⏱ ${name} 总耗时`);
+                    console.groupEnd();
+                    console.groupEnd();
+
                     return merged;
 
                 } catch (err) {
-                    console.warn(`[${name}] 查询失败:`, err);
+                    console.error(`🔥 [${name}] 查询异常，继续下一个`, err);
+                    console.timeEnd(`⏱ ${name} 总耗时`);
+                    console.groupEnd();
                 }
             }
 
-            // fallback: 所有名字尝试失败
+            console.warn(`❌ 查询结束：${nameList} 未查询到有效数据`);
+
+            console.groupEnd();
+
             return {
                 name: nameList[0],
                 source: '',
@@ -1411,6 +1474,38 @@
         _extractNumber(str) {
             const match = str.match(/\d+/);
             return match ? parseInt(match[0], 10) : null;
+        }
+
+        /**
+         * 为异步操作添加超时控制
+         *
+         * @param {Promise} promise - 原始Promise
+         * @param {number} ms - 超时时间(ms)
+         * @param {string} sourceName - 数据源标识
+         * @param {string} name - 查询名称（用于日志）
+         * @returns {Promise} 超时返回null，否则返回原始结果
+         *
+         * @example
+         * await _withTimeout(apiCall(), 5000, "API", "三上悠亚");
+         */
+        _withTimeout(promise, ms, sourceName, name) {
+
+            let timerId;
+
+            const timeoutPromise = new Promise(resolve => {
+                timerId = setTimeout(() => {
+                    console.warn(`⏱️ [${name}] ${sourceName} 超时 ${ms}ms`);
+                    resolve(null);
+                }, ms);
+            });
+
+            return Promise.race([
+                promise.finally(() => {
+                    // ⭐ 关键：一旦真实 promise 结束，立刻清掉定时器
+                    clearTimeout(timerId);
+                }),
+                timeoutPromise
+            ]);
         }
         // 辅助函数 end
 
