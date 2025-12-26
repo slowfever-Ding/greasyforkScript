@@ -45,7 +45,7 @@
 // @connect     av-wiki.net
 // @connect     www.xb1.com
 // @connect     www.javrate.com
-// @version     1.2.0
+// @version     1.2.1
 // @author      slowFever
 // @description 自动提取当前页面中的神秘代码，并显示演员信息，适用于各类影迷相关网站。
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=www.succai.com
@@ -812,8 +812,8 @@
                             // 搜索结果页，找到演员列表
                             const actorListEle = doc.querySelector('.body-root > section.body-container > section.actor-grid > .actor-card');
 
-                            // 如果没有找到演员列表，或者列表为空，返回null
-                            if (actorListEle.children.length === 0 && actorListEle.innerHTML.trim() === '') resolve(null);
+                            // 如果演员列表元素不存在，或存在但无任何子元素和内容，则返回null（表示无数据）
+                            if (!actorListEle || (actorListEle.children.length === 0 && actorListEle.innerHTML.trim() === '')) return resolve(null);
 
                             // 取第一个演员项
                             const firstActorLink = actorListEle.firstElementChild;
